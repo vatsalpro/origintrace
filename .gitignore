@@ -1,0 +1,28 @@
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Node & Frontend
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+
+# Python cache & testing
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Local databases and uploads
+data/*.db
+data/uploads/*
+!data/uploads/.gitkeep
+!data/sample/.gitkeep
+
+# Environment variables & secrets
+.env
+
+# OS Files
+Thumbs.db
+.DS_Store
