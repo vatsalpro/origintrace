@@ -16,7 +16,6 @@ def generate_investigation_report(
     title = investigation.get("title", f"Investigation {inv_id}")
     input_type = investigation.get("input_type")
     input_content = investigation.get("input_content", "Uploaded File")
-    created_at = investigation.get("created_at")
 
     # Connector coverage breakdown
     coverage_summary = {
@@ -60,13 +59,18 @@ def generate_investigation_report(
     for ev in evidence:
         ts_str = ev.get("primary_timestamp")
         ts_display = ts_str.strftime("%Y-%m-%d %H:%M:%S UTC") if hasattr(ts_str, "strftime") else str(ts_str or "Undated")
+        v_sim = ev.get("visual_similarity")
+        v_sim_str = f"Visual Sim: {int(v_sim*100)}%" if v_sim is not None else "Text/Claim only"
         evidence_rows_html += f"""
         <tr>
             <td style="padding: 10px; border-bottom: 1px solid #1e293b; color: #38BDF8;"><strong>{ev.get('source_platform', '').upper()}</strong></td>
             <td style="padding: 10px; border-bottom: 1px solid #1e293b;"><a href="{ev.get('source_url')}" target="_blank" style="color: #38BDF8; text-decoration: underline;">{ev.get('source_url')[:45]}...</a></td>
             <td style="padding: 10px; border-bottom: 1px solid #1e293b;">{ev.get('author_name') or ev.get('author_handle') or 'N/A'}</td>
             <td style="padding: 10px; border-bottom: 1px solid #1e293b;">{ts_display}</td>
-            <td style="padding: 10px; border-bottom: 1px solid #1e293b;"><span style="display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; background: #1e293b; color: #F8FAFC;">{ev.get('evidence_strength')}</span></td>
+            <td style="padding: 10px; border-bottom: 1px solid #1e293b;">
+                <span style="display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; background: #1e293b; color: #F8FAFC;">{ev.get('evidence_strength')}</span>
+                <span style="display: block; font-size: 11px; color: #38BDF8; margin-top: 2px;">{v_sim_str}</span>
+            </td>
             <td style="padding: 10px; border-bottom: 1px solid #1e293b; color: #94A3B8; font-size: 13px;">{ev.get('content_snippet', '')[:120]}</td>
         </tr>
         """
@@ -84,14 +88,18 @@ def generate_investigation_report(
 
     asset_details_html = ""
     for a in assets:
+        camera_str = f"{a.get('camera_make', '')} {a.get('camera_model', '')}".strip() or "Stripped / None"
         asset_details_html += f"""
-        <div style="background: #182235; padding: 12px; border-radius: 6px; margin-bottom: 10px; font-family: monospace; font-size: 13px;">
-            <div><strong>Asset Type:</strong> {a.get('asset_type')}</div>
-            <div><strong>SHA-256:</strong> {a.get('sha256') or 'N/A'}</div>
-            <div><strong>Perceptual Hash (pHash):</strong> {a.get('perceptual_hash') or 'N/A'}</div>
-            <div><strong>Difference Hash (dHash):</strong> {a.get('difference_hash') or 'N/A'}</div>
-            <div><strong>Dimensions:</strong> {a.get('image_width')}x{a.get('image_height')} ({a.get('image_format') or 'N/A'})</div>
-            <div><strong>OCR Extracted Text:</strong> {a.get('ocr_text') or '(None)'}</div>
+        <div style="background: #182235; padding: 14px; border-radius: 6px; margin-bottom: 10px; font-family: monospace; font-size: 13px; border: 1px solid #1e293b;">
+            <div style="margin-bottom: 4px;"><strong>Asset Type:</strong> {a.get('asset_type')}</div>
+            <div style="margin-bottom: 4px;"><strong>SHA-256:</strong> {a.get('sha256') or 'N/A'}</div>
+            <div style="margin-bottom: 4px;"><strong>Perceptual Hash (pHash):</strong> {a.get('perceptual_hash') or 'N/A'}</div>
+            <div style="margin-bottom: 4px;"><strong>Difference Hash (dHash):</strong> {a.get('difference_hash') or 'N/A'}</div>
+            <div style="margin-bottom: 4px;"><strong>Dimensions:</strong> {a.get('image_width')}x{a.get('image_height')} ({a.get('image_format') or 'N/A'})</div>
+            <div style="margin-bottom: 4px;"><strong>Camera / Hardware:</strong> {camera_str}</div>
+            <div style="margin-bottom: 4px;"><strong>Capture Timestamp:</strong> {a.get('capture_time') or 'Not recorded in EXIF'}</div>
+            <div style="margin-bottom: 4px;"><strong>OCR Status:</strong> {a.get('ocr_status') or 'N/A'}</div>
+            <div><strong>OCR Extracted Text:</strong> {a.get('ocr_text') or '(No text detected)'}</div>
         </div>
         """
 
@@ -157,7 +165,7 @@ def generate_investigation_report(
                     <th>Source URL</th>
                     <th>Author / Handle</th>
                     <th>Publication / Capture Date</th>
-                    <th>Evidence Strength</th>
+                    <th>Evidence Strength & Visual Sim</th>
                     <th>Content Excerpt</th>
                 </tr>
             </thead>

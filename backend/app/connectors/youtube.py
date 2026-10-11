@@ -4,6 +4,7 @@ from typing import List, Dict, Any, Optional
 import httpx
 from app.connectors.base import BaseConnector, ConnectorResult
 from app.core.config import settings
+from app.core.url_validator import validate_and_normalize_source_url
 
 def parse_iso_datetime(dt_str: Optional[str]) -> Optional[datetime]:
     if not dt_str:
@@ -38,19 +39,37 @@ class YouTubeConnector(BaseConnector):
     def is_configured(self) -> bool:
         return bool(settings.YOUTUBE_API_KEY and len(settings.YOUTUBE_API_KEY.strip()) > 5)
 
+    def get_masked_api_key(self) -> str:
+        key = (settings.YOUTUBE_API_KEY or "").strip()
+        if len(key) >= 8:
+            return f"{key[:4]}...{key[-4:]}"
+        return "(not configured)"
+
     async def health_check(self) -> Dict[str, Any]:
         if not self.is_configured():
             return {
                 "status": "unconfigured",
                 "available": False,
-                "notes": "YouTube API key not configured. Optional feature."
+                "notes": "YouTube API key not configured. Set YOUTUBE_API_KEY in .env."
             }
-        url = f"https://www.googleapis.com/youtube/v3/search?part=snippet&q=test&maxResults=1&key={settings.YOUTUBE_API_KEY}"
+        url = f"https://www.googleapis.com/youtube/v3/search?part=snippet&q=news&maxResults=1&key={settings.YOUTUBE_API_KEY}"
         try:
             async with httpx.AsyncClient(timeout=6.0) as client:
                 res = await client.get(url)
                 if res.status_code == 200:
-                    return {"status": "healthy", "available": True, "notes": "YouTube Data API v3 active"}
+                    return {
+                        "status": "healthy",
+                        "available": True,
+                        "masked_key": self.get_masked_api_key(),
+                        "notes": "Connected to YouTube Data API v3."
+                    }
+                elif res.status_code == 403:
+                    return {
+                        "status": "rate_limited",
+                        "available": False,
+                        "masked_key": self.get_masked_api_key(),
+                        "notes": "YouTube API quota exceeded or key restricted (HTTP 403)."
+                    }
                 return {"status": "error", "available": False, "notes": f"HTTP {res.status_code}"}
         except Exception as e:
             return {"status": "error", "available": False, "notes": str(e)}
@@ -124,20 +143,35 @@ class YouTubeConnector(BaseConnector):
                     thumbnails = snippet.get("thumbnails", {})
                     media_urls = [thumbnails[k]["url"] for k in ("high", "medium", "default") if k in thumbnails]
 
+                    norm_url = validate_and_normalize_source_url(
+                        video_url,
+                        title=snippet.get("title"),
+                        source_platform="youtube"
+                    )
+                    clean_source_url = norm_url.get("clean_url") or video_url
+                    thumb_preview = media_urls[0] if media_urls else None
+
                     records.append({
                         "source_platform": "youtube",
-                        "source_url": video_url,
+                        "source_url": clean_source_url,
                         "source_post_id": video_id,
                         "author_name": snippet.get("channelTitle"),
                         "author_handle": snippet.get("channelId"),
                         "title_or_caption": snippet.get("title"),
                         "content_snippet": snippet.get("description"),
                         "media_urls": media_urls[:1],
+                        "candidate_image_url": thumb_preview,
+                        "candidate_thumbnail_url": thumb_preview,
                         "match_type": "semantic_claim",
                         "composite_score": 0.80,
                         "match_signals": {
                             "channel": snippet.get("channelTitle"),
-                            "live_broadcast": snippet.get("liveBroadcastContent")
+                            "live_broadcast": snippet.get("liveBroadcastContent"),
+                            "source_domain": "youtube.com",
+                            "search_provider": "YouTube Data API v3",
+                            "fallback_search_url": norm_url.get("fallback_search_url"),
+                            "fallback_query": norm_url.get("fallback_query"),
+                            "original_raw_url": video_url,
                         },
                         "evidence_strength": "Probable match",
                         "reported_published_at": dt,

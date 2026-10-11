@@ -19,10 +19,23 @@ data/*.db
 data/uploads/*
 !data/uploads/.gitkeep
 !data/sample/.gitkeep
+data/cache/
+data/candidates/
+data/thumbnails/
+data/temp_incognito/
+data/origintrace_pids.txt
 
 # Environment variables & secrets
 .env
+*.env.local
 
 # OS Files
 Thumbs.db
 .DS_Store
+
+# Logs and Archives
+*.log
+*.zip
+
+# Nested duplicate folder
+new hackathon/

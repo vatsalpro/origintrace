@@ -1,5 +1,6 @@
 import networkx as nx
 from typing import List, Dict, Any, Optional
+from app.core.url_validator import validate_and_normalize_source_url
 
 def build_origin_graph(
     investigation_id: str,
@@ -38,6 +39,14 @@ def build_origin_graph(
         primary_ts = ev.get("primary_timestamp")
         ts_str = primary_ts.isoformat() if hasattr(primary_ts, "isoformat") else (str(primary_ts) if primary_ts else None)
 
+        raw_url = ev.get("source_url", "")
+        raw_title = ev.get("title_or_caption") or ev_id
+        norm = validate_and_normalize_source_url(raw_url, raw_title, platform)
+        clean_url = norm["clean_url"] if norm["is_valid"] else raw_url
+
+        media_urls = ev.get("media_urls") or []
+        cand_img = ev.get("candidate_image_url") or (media_urls[0] if media_urls else None)
+
         node_label = f"[{platform.upper()}] " + (ev.get("author_handle") or ev.get("author_name") or ev.get("title_or_caption") or ev_id)[:25]
 
         G.add_node(
@@ -46,7 +55,7 @@ def build_origin_graph(
             node_type="archive" if platform == "wayback" else "post",
             platform=platform,
             timestamp=ts_str,
-            url=ev.get("source_url"),
+            url=clean_url,
             evidence_strength=strength,
             is_earliest=is_earliest,
             data={
@@ -54,7 +63,17 @@ def build_origin_graph(
                 "composite_score": ev.get("composite_score", 0.0),
                 "timestamp_type": ev.get("timestamp_type"),
                 "match_signals": ev.get("match_signals", {}),
-                "content_snippet": (ev.get("content_snippet") or "")[:200]
+                "content_snippet": (ev.get("content_snippet") or "")[:200],
+                "candidate_image_url": cand_img,
+                "candidate_thumbnail_path": ev.get("candidate_thumbnail_path") or ev.get("candidate_thumbnail_url"),
+                "source_domain": norm["domain"],
+                "fallback_search_url": norm["fallback_search_url"],
+                "fallback_query": norm["fallback_query"],
+                "url_type": norm["url_type"],
+                "is_direct_image": norm["is_direct_image"],
+                "access_status": ev.get("access_status", "accessible" if norm["is_valid"] else "malformed"),
+                "original_raw_url": raw_url,
+                "title": raw_title
             }
         )
 

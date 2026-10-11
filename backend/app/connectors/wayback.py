@@ -4,6 +4,7 @@ from typing import List, Dict, Any, Optional
 import httpx
 from app.connectors.base import BaseConnector, ConnectorResult
 from app.core.config import settings
+from app.core.url_validator import validate_and_normalize_source_url
 
 def parse_wayback_timestamp(ts_str: str) -> Optional[datetime]:
     """Parses 14-digit Wayback timestamp 'YYYYMMDDhhmmss' into UTC datetime."""
@@ -109,9 +110,11 @@ class WaybackConnector(BaseConnector):
                     parsed_dt = parse_wayback_timestamp(ts_str)
                     wayback_snapshot_url = f"https://web.archive.org/web/{ts_str}/{original}" if ts_str else ""
 
+                    norm_url = validate_and_normalize_source_url(wayback_snapshot_url, f"Wayback Snapshot of {original}", "wayback")
+
                     records.append({
                         "source_platform": "wayback",
-                        "source_url": wayback_snapshot_url,
+                        "source_url": norm_url["clean_url"] if norm_url["is_valid"] else wayback_snapshot_url,
                         "source_post_id": f"wb-{ts_str}",
                         "title_or_caption": f"Wayback Snapshot of {original}",
                         "content_snippet": f"Archived capture at timestamp {ts_str} (MIME: {row_dict.get('mimetype')}, Status: {row_dict.get('statuscode')})",
@@ -121,7 +124,13 @@ class WaybackConnector(BaseConnector):
                             "archive_digest": row_dict.get("digest"),
                             "status_code": row_dict.get("statuscode"),
                             "mimetype": row_dict.get("mimetype"),
-                            "original_url": original
+                            "original_url": original,
+                            "source_domain": "web.archive.org",
+                            "search_provider": "Internet Archive Wayback Machine",
+                            "discovery_method": "cdx_snapshot",
+                            "url_type": "source_webpage",
+                            "fallback_search_url": norm_url["fallback_search_url"],
+                            "fallback_query": norm_url["fallback_query"]
                         },
                         "evidence_strength": "Strong match",
                         "reported_published_at": None,

@@ -14,11 +14,15 @@ class Investigation(Base):
     title = Column(String(255), nullable=False)
     input_type = Column(String(50), nullable=False)  # "url", "image", "video", "screenshot", "text", "combined"
     input_content = Column(Text, nullable=True)     # Post URL or text claim
-    status = Column(String(50), default="created")  # "created", "processing", "completed", "partial_failure", "failed"
+    status = Column(String(50), default="created")  # "created", "processing", "completed", "completed_with_warnings", "failed"
+    current_stage = Column(String(64), default="created")
+    stage_details = Column(JSON, default=dict)
     parameters = Column(JSON, default=dict)
+    selected_platforms = Column(JSON, default=list)
     earliest_discovered_reference = Column(JSON, nullable=True)
     summary = Column(Text, nullable=True)
     is_synthetic = Column(Boolean, default=False)
+    is_incognito = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), default=utcnow)
     updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
@@ -36,7 +40,9 @@ class InputAsset(Base):
     investigation_id = Column(String(36), ForeignKey("investigations.id"), nullable=False)
     asset_type = Column(String(50), nullable=False)  # "image", "video", "screenshot", "text", "webpage"
     file_path = Column(String(512), nullable=True)
+    thumbnail_path = Column(String(512), nullable=True)
     original_filename = Column(String(255), nullable=True)
+    mime_type = Column(String(128), nullable=True)
     file_size_bytes = Column(Integer, default=0)
     
     # Image Fingerprints
@@ -48,11 +54,25 @@ class InputAsset(Base):
     image_width = Column(Integer, nullable=True)
     image_height = Column(Integer, nullable=True)
     image_format = Column(String(32), nullable=True)
+    
+    # Deep Metadata
+    camera_make = Column(String(128), nullable=True)
+    camera_model = Column(String(128), nullable=True)
+    software = Column(String(128), nullable=True)
+    capture_time = Column(String(64), nullable=True)
+    gps_info = Column(JSON, default=dict)
+    icc_profile = Column(String(128), nullable=True)
     exif_data = Column(JSON, default=dict)
     
-    # Text Analysis
+    # Text & OCR Analysis
+    ocr_status = Column(String(64), default="pending")  # "detected", "no_text_detected", "failed", "unavailable"
+    ocr_confidence = Column(Float, nullable=True)
     ocr_text = Column(Text, nullable=True)
     extracted_entities = Column(JSON, default=dict)  # urls, hashtags, handles, dates
+
+    # C2PA Content Credentials Verification
+    c2pa_status = Column(String(64), default="unavailable")  # "verified", "invalid", "untrusted", "no_manifest", "unavailable"
+    c2pa_data = Column(JSON, default=dict)
     
     created_at = Column(DateTime(timezone=True), default=utcnow)
 
@@ -64,7 +84,7 @@ class EvidenceRecord(Base):
 
     id = Column(String(36), primary_key=True, default=lambda: f"EVD-{uuid.uuid4().hex[:8].upper()}")
     investigation_id = Column(String(36), ForeignKey("investigations.id"), nullable=False)
-    source_platform = Column(String(50), nullable=False)  # "bluesky", "mastodon", "wayback", "youtube", "reddit", "web", "synthetic"
+    source_platform = Column(String(50), nullable=False)  # "bluesky", "mastodon", "wayback", "youtube", "reddit", "reverse_image", "web", "synthetic"
     source_url = Column(String(1024), nullable=False)
     source_post_id = Column(String(255), nullable=True)
     author_name = Column(String(255), nullable=True)
@@ -73,11 +93,27 @@ class EvidenceRecord(Base):
     content_snippet = Column(Text, nullable=True)
     media_urls = Column(JSON, default=list)
     
-    # Match Assessment
+    # Candidate media comparison
+    candidate_image_url = Column(String(1024), nullable=True)
+    candidate_thumbnail_path = Column(String(512), nullable=True)
+    candidate_sha256 = Column(String(64), nullable=True)
+    candidate_phash = Column(String(64), nullable=True)
+    candidate_dhash = Column(String(64), nullable=True)
+    candidate_width = Column(Integer, nullable=True)
+    candidate_height = Column(Integer, nullable=True)
+    
+    # Match Assessment & Separate Indicators
     match_type = Column(String(50), nullable=False)  # "exact", "strong_visual", "transformed_copy", "semantic_claim", "citation", "repost", "unrelated"
     composite_score = Column(Float, default=0.0)
+    visual_similarity = Column(Float, nullable=True)
+    text_relevance = Column(Float, nullable=True)
+    source_reliability_score = Column(Float, default=0.5)
+    metadata_consistency_score = Column(Float, default=0.5)
     match_signals = Column(JSON, default=dict)
     evidence_strength = Column(String(50), default="Inconclusive")  # Strong match, Probable match, Possible match, Related claim only, Inconclusive
+    
+    # Forensic Transparency
+    explanation = Column(Text, nullable=True)  # What supports the result, observed vs inferred, what could invalidate it
     
     # Provenance Timestamps (Strict UTC + Reliability)
     reported_published_at = Column(DateTime(timezone=True), nullable=True)
@@ -119,6 +155,8 @@ class ConnectorExecutionLog(Base):
     investigation_id = Column(String(36), ForeignKey("investigations.id"), nullable=False)
     connector_name = Column(String(64), nullable=False)
     search_parameters = Column(JSON, default=dict)
+    queries_executed = Column(JSON, default=list)
+    items_inspected = Column(Integer, default=0)
     status = Column(String(64), nullable=False)  # "completed_with_matches", "completed_no_matches", "partially_completed", "rate_limited", "access_denied", "not_configured", "error"
     results_count = Column(Integer, default=0)
     started_at = Column(DateTime(timezone=True), default=utcnow)

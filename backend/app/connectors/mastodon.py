@@ -6,6 +6,7 @@ import httpx
 from bs4 import BeautifulSoup
 from app.connectors.base import BaseConnector, ConnectorResult
 from app.core.config import settings
+from app.core.url_validator import validate_and_normalize_source_url
 
 def strip_html_content(html_str: str) -> str:
     if not html_str:
@@ -117,6 +118,10 @@ class MastodonConnector(BaseConnector):
                     text = strip_html_content(s.get("content", ""))
                     post_url = s.get("url") or f"https://{instance}/@{account.get('username')}/{s.get('id')}"
 
+                    post_title = f"Mastodon status on {instance} by {account.get('username') or 'user'}"
+                    norm_url = validate_and_normalize_source_url(post_url, post_title, "mastodon")
+                    clean_source_url = norm_url["clean_url"] if norm_url["is_valid"] else post_url
+
                     media_urls = []
                     attachments = s.get("media_attachments", [])
                     for att in attachments:
@@ -125,21 +130,31 @@ class MastodonConnector(BaseConnector):
                         elif att.get("preview_url"):
                             media_urls.append(att.get("preview_url"))
 
+                    cand_img = media_urls[0] if media_urls else None
+
                     records.append({
                         "source_platform": "mastodon",
-                        "source_url": post_url,
+                        "source_url": clean_source_url,
                         "source_post_id": str(s.get("id")),
                         "author_name": account.get("display_name") or account.get("username"),
                         "author_handle": f"@{account.get('acct')}" if account.get("acct") else None,
-                        "title_or_caption": f"Mastodon status on {instance}",
+                        "title_or_caption": post_title,
                         "content_snippet": text,
                         "media_urls": media_urls,
+                        "candidate_image_url": cand_img,
+                        "candidate_thumbnail_url": cand_img,
                         "match_type": "semantic_claim",
                         "composite_score": 0.85,
                         "match_signals": {
                             "reblogs": s.get("reblogs_count", 0),
                             "favourites": s.get("favourites_count", 0),
-                            "instance": instance
+                            "instance": instance,
+                            "source_domain": norm_url["domain"] or instance,
+                            "search_provider": f"Mastodon ({instance})",
+                            "discovery_method": "text_query",
+                            "fallback_search_url": norm_url["fallback_search_url"],
+                            "fallback_query": norm_url["fallback_query"],
+                            "original_raw_url": post_url
                         },
                         "evidence_strength": "Probable match",
                         "reported_published_at": dt,
@@ -148,7 +163,7 @@ class MastodonConnector(BaseConnector):
                         "timestamp_type": "source_publication",
                         "timestamp_reliability": "high",
                         "ambiguity_notes": f"Federated post indexed by instance {instance}.",
-                        "access_status": "accessible"
+                        "access_status": "accessible" if norm_url["is_valid"] else "malformed"
                     })
 
                 records.sort(key=lambda r: r.get("primary_timestamp") or datetime.max.replace(tzinfo=timezone.utc))

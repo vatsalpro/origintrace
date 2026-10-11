@@ -4,6 +4,7 @@ from typing import List, Dict, Any, Optional
 import httpx
 from app.connectors.base import BaseConnector, ConnectorResult
 from app.core.config import settings
+from app.core.url_validator import validate_and_normalize_source_url
 
 def parse_iso_datetime(dt_str: Optional[str]) -> Optional[datetime]:
     if not dt_str:
@@ -103,34 +104,55 @@ class BlueskyConnector(BaseConnector):
                     uri = p.get("uri", "")
                     rkey = uri.split("/")[-1] if "/" in uri else ""
                     handle = author.get("handle", "")
-                    post_url = f"https://bsky.app/profile/{handle}/post/{rkey}" if handle and rkey else uri
+                    did = author.get("did", "")
+                    actor = handle or did or (uri.split("/")[2] if uri.startswith("at://") else "")
+                    
+                    if actor and rkey:
+                        post_url = f"https://bsky.app/profile/{actor}/post/{rkey}"
+                    elif actor:
+                        post_url = f"https://bsky.app/profile/{actor}"
+                    else:
+                        post_url = uri
+
+                    title_str = f"Bluesky post by {handle or author.get('displayName') or 'user'}"
+                    norm_url = validate_and_normalize_source_url(post_url, title_str, "bluesky")
+                    clean_source_url = norm_url["clean_url"] if norm_url["is_valid"] else post_url
 
                     media_urls = []
                     embed = p.get("embed", {})
                     if "images" in embed and isinstance(embed["images"], list):
                         for img in embed["images"]:
-                            if "thumb" in img:
-                                media_urls.append(img["thumb"])
-                            elif "fullsize" in img:
+                            if "fullsize" in img:
                                 media_urls.append(img["fullsize"])
+                            elif "thumb" in img:
+                                media_urls.append(img["thumb"])
 
+                    thumb_preview = media_urls[0] if media_urls else None
                     text_snippet = record.get("text", "")
 
                     records.append({
                         "source_platform": "bluesky",
-                        "source_url": post_url,
+                        "source_url": clean_source_url,
                         "source_post_id": uri,
                         "author_name": author.get("displayName") or handle,
                         "author_handle": f"@{handle}" if handle else None,
-                        "title_or_caption": f"Bluesky post by {handle}",
+                        "title_or_caption": title_str,
                         "content_snippet": text_snippet,
                         "media_urls": media_urls,
+                        "candidate_image_url": thumb_preview,
+                        "candidate_thumbnail_url": thumb_preview,
                         "match_type": "semantic_claim",
                         "composite_score": 0.85,
                         "match_signals": {
                             "reposts": p.get("repostCount", 0),
                             "likes": p.get("likeCount", 0),
-                            "indexed_at": p.get("indexedAt")
+                            "indexed_at": p.get("indexedAt"),
+                            "source_domain": norm_url["domain"] or "bsky.app",
+                            "search_provider": "Bluesky Public AT Protocol",
+                            "discovery_method": "text_query",
+                            "fallback_search_url": norm_url["fallback_search_url"],
+                            "fallback_query": norm_url["fallback_query"],
+                            "original_raw_url": uri
                         },
                         "evidence_strength": "Probable match",
                         "reported_published_at": dt,
@@ -139,7 +161,7 @@ class BlueskyConnector(BaseConnector):
                         "timestamp_type": "source_publication",
                         "timestamp_reliability": "high",
                         "ambiguity_notes": "Timestamp provided by authenticated Bluesky protocol record.",
-                        "access_status": "accessible"
+                        "access_status": "accessible" if norm_url["is_valid"] else "malformed"
                     })
 
                 records.sort(key=lambda r: r.get("primary_timestamp") or datetime.max.replace(tzinfo=timezone.utc))

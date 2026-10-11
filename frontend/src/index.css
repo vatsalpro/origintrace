@@ -2,22 +2,22 @@
 
 @layer base {
   :root {
-    --bg-primary: #0B1020;
-    --bg-card: #111827;
-    --bg-secondary: #182235;
-    --bg-tertiary: #1f2d47;
-    --border-color: #1e293b;
-    --accent-primary: #38BDF8;
-    --accent-hover: #0ea5e9;
-    --text-primary: #F8FAFC;
-    --text-muted: #94A3B8;
-    --success: #22C55E;
-    --warning: #F59E0B;
-    --error: #EF4444;
+    --bg-main: #F5F7FB;
+    --surface-primary: #FFFFFF;
+    --surface-secondary: #F8FAFD;
+    --text-primary: #17243A;
+    --text-secondary: #64748B;
+    --border-subtle: #E2E8F0;
+    --primary-blue: #2563EB;
+    --color-success: #0F9D78;
+    --color-warning: #C78616;
+    --color-error: #D14343;
+    --color-violet: #805AD5;
+    --color-cyan: #0891B2;
   }
 
   body {
-    background-color: var(--bg-primary);
+    background-color: var(--bg-main);
     color: var(--text-primary);
     font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     min-height: 100vh;
@@ -33,19 +33,19 @@
     width: 100%;
   }
 
-  /* Custom scrollbars for forensic look */
+  /* Custom scrollbars for clean light-theme forensic look */
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
   }
   ::-webkit-scrollbar-track {
-    background: #0B1020;
+    background: #F1F5F9;
   }
   ::-webkit-scrollbar-thumb {
-    background: #1e293b;
+    background: #CBD5E1;
     border-radius: 3px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #334155;
+    background: #94A3B8;
   }
 }

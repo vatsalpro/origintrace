@@ -10,7 +10,9 @@ class ConnectorResult:
         records: Optional[List[Dict[str, Any]]] = None,
         duration_ms: int = 0,
         coverage_notes: str = "",
-        error_message: Optional[str] = None
+        error_message: Optional[str] = None,
+        credits_consumed: int = 0,
+        is_cached: bool = False
     ):
         self.connector_name = connector_name
         self.status = status
@@ -18,6 +20,8 @@ class ConnectorResult:
         self.duration_ms = duration_ms
         self.coverage_notes = coverage_notes
         self.error_message = error_message
+        self.credits_consumed = credits_consumed
+        self.is_cached = is_cached
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -27,7 +31,9 @@ class ConnectorResult:
             "records": self.records,
             "duration_ms": self.duration_ms,
             "coverage_notes": self.coverage_notes,
-            "error_message": self.error_message
+            "error_message": self.error_message,
+            "credits_consumed": self.credits_consumed,
+            "is_cached": self.is_cached
         }
 
 

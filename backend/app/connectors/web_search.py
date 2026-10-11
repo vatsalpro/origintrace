@@ -6,6 +6,7 @@ from bs4 import BeautifulSoup
 from app.connectors.base import BaseConnector, ConnectorResult
 from app.core.config import settings
 from app.core.security import validate_public_url
+from app.core.url_validator import validate_and_normalize_source_url
 
 class WebSearchConnector(BaseConnector):
     @property
@@ -101,19 +102,37 @@ class WebSearchConnector(BaseConnector):
                 # Media
                 og_img = soup.find("meta", property="og:image")
                 media_urls = [og_img["content"]] if og_img and og_img.get("content") else []
+                cand_img = media_urls[0] if media_urls else None
+
+                target_title = title or url
+                norm_url = validate_and_normalize_source_url(str(res.url), target_title, "web")
+                clean_url = norm_url["clean_url"] if norm_url["is_valid"] else str(res.url)
 
                 return {
                     "source_platform": "web",
-                    "source_url": str(res.url),
-                    "title_or_caption": title or url,
+                    "source_url": clean_url,
+                    "title_or_caption": target_title,
                     "content_snippet": meta_desc[:400],
                     "author_name": author,
                     "media_urls": media_urls,
+                    "candidate_image_url": cand_img,
+                    "candidate_thumbnail_url": cand_img,
+                    "match_type": "semantic_claim",
+                    "composite_score": 0.80,
+                    "match_signals": {
+                        "source_domain": norm_url["domain"] or "web",
+                        "search_provider": "Public Web Discovery",
+                        "discovery_method": "webpage_metadata",
+                        "fallback_search_url": norm_url["fallback_search_url"],
+                        "fallback_query": norm_url["fallback_query"],
+                        "original_raw_url": str(res.url)
+                    },
+                    "evidence_strength": "Probable match",
                     "reported_published_at": pub_time,
                     "primary_timestamp": pub_time,
                     "timestamp_type": "source_publication" if pub_time else "retrieval_only",
                     "timestamp_reliability": "medium" if pub_time else "low",
-                    "access_status": "accessible"
+                    "access_status": "accessible" if norm_url["is_valid"] else "malformed"
                 }
 
         except Exception as e:

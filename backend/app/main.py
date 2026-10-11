@@ -12,13 +12,18 @@ from app.api.benchmark import router as benchmark_router
 import app.models.entities  # Ensure models are loaded into Base metadata
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+from app.database.session import engine, Base, incognito_engine, upgrade_db_schema
+
 logger = logging.getLogger("origintrace")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Create DB tables
-    logger.info("Initializing database tables...")
+    # Create DB tables and upgrade schema safely
+    logger.info("Initializing database tables and checking schema...")
     Base.metadata.create_all(bind=engine)
+    upgrade_db_schema()
+    # Initialize in-memory tables for Incognito Mode (RAM-only)
+    Base.metadata.create_all(bind=incognito_engine)
     logger.info("OriginTrace AI backend ready.")
     yield
 

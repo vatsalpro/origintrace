@@ -6,6 +6,10 @@ from app.schemas.schemas import ConnectorStatus
 router = APIRouter(prefix="/api/connectors", tags=["connectors"])
 
 CONNECTOR_DOCS = {
+    "reverse_image": {
+        "description": "Reverse-image search provider querying Google Lens / web visual indexes.",
+        "limitations": "Requires SERPAPI_API_KEY. Without API key, local perceptual hashing is used for candidates discovered via other sources."
+    },
     "wayback": {
         "description": "Internet Archive Wayback Machine CDX historical snapshot discovery.",
         "limitations": "Captures represent archival snapshots, not verified original publication dates. Private/unarchived URLs cannot be discovered."
@@ -22,9 +26,9 @@ CONNECTOR_DOCS = {
         "description": "Google YouTube Data API v3 video title, description, and thumbnail discovery.",
         "limitations": "Requires free developer quota API key. Does not access unlisted, private, or age-gated videos."
     },
-    "reddit": {
-        "description": "Reddit public discussion discovery using OAuth application client credentials.",
-        "limitations": "Requires approved Reddit developer credentials. Scrapes or unauthenticated bypasses are prohibited."
+    "openverse": {
+        "description": "Publicly licensed image catalog discovery via Openverse API.",
+        "limitations": "Queries by OCR text and keywords, not reverse-image search. Candidate images are compared locally using perceptual hashes."
     },
     "web_search": {
         "description": "Public webpage metadata, OpenGraph, JSON-LD, and publication date extraction with SSRF security filter.",
