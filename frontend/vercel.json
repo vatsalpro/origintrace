@@ -1,8 +1,11 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": "vite",
   "cleanUrls": true,
   "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://origintrace-backend.onrender.com/api/:path*"
+    },
     {
       "source": "/(.*)",
       "destination": "/index.html"
